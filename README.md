@@ -7,6 +7,14 @@ An interactive, research-grade web application for simulating and analyzing **St
 
 **🔗 Live Demo:** [https://sr-88-simulator.onrender.com](https://sr-88-simulator.onrender.com)
 
+## 📸 Screenshot
+
+<p align="center">
+  <img src="Simulator.png" alt="Sr-88 Rydberg Simulator Dashboard" width="800" />
+  <br />
+  <em>Interactive simulation dashboard for Strontium-88 circular Rydberg atoms</em>
+</p>
+
 ## ✨ Features
 
 - **🔬 Atomic Structure Browser:** Visualize Strontium-88 energy levels, quantum defects, and Rydberg series.
