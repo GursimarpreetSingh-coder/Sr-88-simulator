@@ -1,0 +1,8 @@
+{
+  "name": "Strontium Rydberg",
+  "description": "Strontium Rydberg Simulator",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
