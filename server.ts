@@ -17,9 +17,9 @@ let engineCore: EngineCore | null = null;
 
 function getEngineCore() {
   if (!engineCore) {
-    const secretKey = process.env.SR88_ENGINE_KEY;
+    const secretKey = process.env.GEMINI_API_KEY;
     if (!secretKey) {
-      console.warn("Warning: SR88_ENGINE_KEY is not configured in environment.");
+      console.warn("Warning: GEMINI_API_KEY is not configured in environment.");
       return null;
     }
     engineCore = new EngineCore({
