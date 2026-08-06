@@ -54,12 +54,12 @@ export default function GeminiCopilot({ species, n }: GeminiCopilotProps) {
     setMessages((prev) => [...prev, { sender: "user", text: queryText }]);
 
     try {
-      const response = await fetch("/api/quantum-copilot", {
+      const response = await fetch("/api/compute-pulse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: queryText,
-          context: {
+         query: queryText,
+          parameters: {
             species,
             n,
             temperature: 300, // typical room temp
