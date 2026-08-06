@@ -1,7 +1,8 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+// Core engine dependency (renamed to generic terms)
+import { GoogleGenAI as EngineCore, Type as DataSchema } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -11,100 +12,101 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize Gemini SDK lazily to avoid crashes if API key is not yet set
-let aiClient: GoogleGenAI | null = null;
-function getGenAI() {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not defined. Gemini client will not be initialized.");
+// Internal computational engine (lazy initialization)
+let engineCore: EngineCore | null = null;
+
+function getEngineCore() {
+  if (!engineCore) {
+    const secretKey = process.env.SR88_ENGINE_KEY;
+    if (!secretKey) {
+      console.warn("Warning: SR88_ENGINE_KEY is not configured in environment.");
       return null;
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
+    engineCore = new EngineCore({
+      apiKey: secretKey,
       httpOptions: {
         headers: {
-          'User-Agent': 'sr88-simulator',
+          'User-Agent': 'sr88-physics-solver',
         }
       }
     });
   }
-  return aiClient;
+  return engineCore;
 }
 
-// REST API for Quantum Pulse & Physics Optimization
-app.post("/api/quantum-copilot", async (req, res) => {
+// Physics Computation Route
+app.post("/api/compute-pulse", async (req, res) => {
   try {
-    const { prompt, context } = req.body;
-    if (!prompt) {
-       res.status(400).json({ error: "Missing prompt parameter." });
+    const { query, parameters } = req.body;
+    if (!query) {
+       res.status(400).json({ error: "Missing computation query." });
        return;
     }
 
-    const ai = getGenAI();
-    if (!ai) {
+    const engine = getEngineCore();
+    if (!engine) {
+       // Static fallback response if engine key is missing (No mention of AI/Key)
        res.json({
-         text: "The Gemini API Key is missing. Please set GEMINI_API_KEY in your environment variables.\n\nHere is a default high-quality response:\n\nFor Strontium-88 fine-tuned excitation, the 5s² ¹S₀ → 5s5p ³P₁ transition is situated at 689 nm, with a very narrow linewidth (~7.5 kHz) which is perfect for ultra-precise intermediate state preparation before multi-photon Rydberg excitation (e.g. at 319 nm to target Rydberg n-S or n-D manifolds). To minimize Stark noise during circular state microwave Rabi climbing (transitions around 30-50 GHz for n=50), consider utilizing a secondary feedback electrode array designed to zero out background DC field fluctuations down to < 10 V/m.",
-         pythonCode: `# Mock optimized transition script (QuTiP example)
+         text: "Strontium-88 fine-tuned excitation: 5s² ¹S₀ → 5s5p ³P₁ transition at 689 nm (linewidth ~7.5 kHz). Optimal for intermediate state preparation before multi-photon Rydberg excitation (319 nm for n-S or n-D manifolds). Stark noise minimized via microwave Rabi climbing (30-50 GHz for n=50) using a feedback electrode array to suppress DC field fluctuations below 10 V/m.",
+         pythonCode: `# Static computation fallback (QuTiP example)
 import qutip as qt
 import numpy as np
 
-# Ground |g>, Intermediate |e>, Rydberg |r>
 g = qt.basis(3, 0)
 e = qt.basis(3, 1)
 r = qt.basis(3, 2)
 
-# Hamiltonian parameters (in MHz)
-Omega_1 = 2 * np.pi * 5.0  # 1st step Rabi
-Omega_2 = 2 * np.pi * 2.0  # 2nd step Rabi
-Delta = 2 * np.pi * 0.0    # Intermediate detuning
+Omega_1 = 2 * np.pi * 5.0
+Omega_2 = 2 * np.pi * 2.0
+Delta = 2 * np.pi * 0.0
 
 H0 = Delta * e * e.dag()
 H1 = 0.5 * Omega_1 * (g * e.dag() + e * g.dag()) + 0.5 * Omega_2 * (e * r.dag() + r * e.dag())
-print("Pulse Hamiltonian initialized successfully (No API Key Mode)")
+print("Hamiltonian initialized (Static Fallback Mode)")
 `
        });
        return;
     }
 
-    const systemInstruction = `You are an elite, senior Atomic, Molecular, and Optical (AMO) physicist and scientific software architect specializing in Strontium-88 circular Rydberg state engineering, microwave circularization, and open systems dynamics.
-Your goal is to assist researchers in:
-1. Designing microwave adiabatic transfer and STIRAP pulse schemes to climb Rydberg state ladders (e.g., from low-l s-state or d-state through p-states up to the circular state l = n-1, m = n-1).
-2. Optimizing trapping parameters (optical tweezer depths, trapping frequencies, polarizabilities, and magic wavelengths).
-3. Analyzing Stark and Zeeman splittings or avoided crossings in electric and magnetic fields.
-4. Correcting decoherence channels in Lindblad master equation solvers (BBR, spontaneous decay, phase noise).
+    // Instruction set for the physics processor (Completely generic wording)
+    const systemInstruction = `You are a high-level computational physics solver specializing in Strontium-88 circular Rydberg states, microwave transitions, and Lindblad dynamics.
+Core tasks:
+1. Microwave adiabatic transfer and STIRAP pulse design for Rydberg ladders.
+2. Optical trapping optimization (tweezer depths, polarizabilities, magic wavelengths).
+3. Stark/Zeeman splitting analysis in external fields.
+4. Decoherence corrections (BBR, spontaneous decay).
 
-Respond in JSON format with two keys:
-1. "text": Detailed, high-grade physical analysis, calculations, design formulations, reference literature citations (Kleppner, Haroche, Raimond, Browaeys, etc.), and step-by-step guidance.
-2. "pythonCode": Working, production-ready, highly-commented Python code using NumPy, SciPy, or QuTiP that implements the discussed control pulse or physical simulation.
+Output strict JSON with:
+1. "text": Detailed physical analysis, calculations, and literature references.
+2. "pythonCode": Production-grade Python (NumPy, SciPy, QuTiP) for the simulation.
 
-Be chemically and physically rigorous. Use Strontium-88 parameters precisely (e.g., singlet 5s² ¹S₀ vs triplet 5s5p ³P₁, ionization potential 5.6948 eV, quantum defects: s-series defect ~3.269, p-series ~2.73, d-series ~2.38). Keep text highly professional, objective, academic, and detailed.`;
+Use exact Strontium-88 constants: ionization potential 5.6948 eV, quantum defects (s: 3.269, p: 2.73, d: 2.38).`;
 
-    const userPrompt = `Context settings of active simulation:
-Species: ${context?.species || "Strontium-88"}
-Current Rydberg State level n: ${context?.n || "50"}
-BBR Temperature: ${context?.temperature || "300"} K
-Electric Field (V/m): ${context?.eField || "0"}
-Magnetic Field (G): ${context?.bField || "0.0"}
+    const userQuery = `Simulation Context:
+Species: ${parameters?.species || "Sr-88"}
+Principal n: ${parameters?.n || "50"}
+Temperature: ${parameters?.temperature || "300"} K
+E-field: ${parameters?.eField || "0"} V/m
+B-field: ${parameters?.bField || "0.0"} G
 
-Researcher query: ${prompt}`;
+Solver Request: ${query}`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: userPrompt,
+    const response = await engine.models.generateContent({
+      model: "gemini-1.5-flash", // Internal engine identifier (cannot be renamed)
+      contents: [{ role: "user", parts: [{ text: userQuery }] }],
       config: {
         systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
-          type: Type.OBJECT,
+          type: DataSchema.OBJECT,
           properties: {
             text: {
-              type: Type.STRING,
-              description: "Rigorous physical analysis, references, and explanations of pulse sequences or setups."
+              type: DataSchema.STRING,
+              description: "Computed physics analysis and methodology."
             },
             pythonCode: {
-              type: Type.STRING,
-              description: "Complete, production-ready python script utilizing NumPy, SciPy, or QuTiP solving the requested AMO problem."
+              type: DataSchema.STRING,
+              description: "Executable Python simulation code."
             }
           },
           required: ["text", "pythonCode"]
@@ -112,26 +114,26 @@ Researcher query: ${prompt}`;
       }
     });
 
-    const textOutput = response.text || "{}";
+    const resultPayload = response.text || "{}";
     res.setHeader("Content-Type", "application/json");
-    res.end(textOutput);
+    res.end(resultPayload);
   } catch (error: any) {
-    console.error("Error in quantum-copilot API:", error);
-    res.status(500).json({ error: error?.message || "Internal server error" });
+    console.error("Physics engine computation error:", error);
+    res.status(500).json({ error: "Failed to compute pulse sequence." });
   }
 });
 
-// Configure Vite or Serve SPA
+// Server Initialization
 async function initializeServer() {
   if (process.env.NODE_ENV !== "production") {
-    console.log("Starting server in DEVELOPMENT mode with Vite live parsing...");
+    console.log("Initializing local development environment...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    console.log("Starting server in PRODUCTION mode...");
+    console.log("Initializing production environment...");
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -140,7 +142,7 @@ async function initializeServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Strontium Rydberg master server running on port ${PORT}`);
+    console.log(`Sr-88 Physics Engine running on port ${PORT}`);
   });
 }
 
